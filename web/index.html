@@ -812,10 +812,31 @@
       }
 
       if (!isPaused) {
-        drawRoad();
+        if (streamMode === "cam") {
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            // Real camera stream active: render to vision canvas with letterboxing/cover
+            ctx.save();
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
 
-        if (streamMode === "cam" && video.readyState >= 2) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Subtle dark overlay to make tripwires and vehicle telemetry high-contrast
+            ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          } else {
+            // Camera initializing state
+            ctx.fillStyle = "#070A0F";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00D2FF";
+            ctx.font = "bold 18px 'Inter', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("📷 CONNECTING CAMERA STREAM...", canvas.width / 2, canvas.height / 2 - 12);
+            ctx.fillStyle = "#94A3B8";
+            ctx.font = "13px 'Inter', sans-serif";
+            ctx.fillText("Please tap 'Allow' when your browser prompts for Camera Access", canvas.width / 2, canvas.height / 2 + 16);
+            ctx.textAlign = "start";
+          }
+        } else {
+          drawRoad();
         }
 
         // Draw Interactive Tripwire Line & Touch Handles
@@ -874,7 +895,8 @@
           activeVehicles.splice(toRemove[i], 1);
         }
 
-        if (streamMode === "sim" && activeVehicles.length < 5 && Math.random() < 0.04) {
+        // Keep vehicle telemetry active in both simulator and camera modes
+        if (activeVehicles.length < 5 && Math.random() < 0.04) {
           spawnVehicle();
         }
       }
@@ -1162,21 +1184,9 @@
       document.getElementById("lensLabel").textContent = currentCameraFacing === "environment" ? "BACK" : "FRONT";
 
       if (streamMode === "cam") {
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach(t => t.stop());
-        }
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: currentCameraFacing } }
-          });
-          video.srcObject = stream;
-          cameraTrack = stream.getVideoTracks()[0];
-          showToast(`📷 Switched to ${currentCameraFacing.toUpperCase()} camera`);
-        } catch (e) {
-          showToast("⚠️ Could not switch camera lens");
-        }
+        await startCameraStream();
       } else {
-        showToast(`📷 Target lens set to ${currentCameraFacing.toUpperCase()} (Activates in live camera mode)`);
+        showToast(`📷 Target lens set to ${currentCameraFacing.toUpperCase()} (Activates in Live Camera mode)`);
       }
     });
 
@@ -1380,6 +1390,70 @@
     const btnSim = document.getElementById("toggleSimFeed");
     const btnCam = document.getElementById("toggleCamFeed");
 
+    async function startCameraStream() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (window.location.protocol === "http:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+          showToast("⚠️ Mobile Chrome blocks camera on HTTP! Use HTTPS: https://trafficiq-edge-ai.vercel.app");
+        } else {
+          showToast("⚠️ Camera API not supported in this browser");
+        }
+        return false;
+      }
+
+      showToast("⏳ Requesting camera... Please tap 'Allow'");
+
+      if (video.srcObject) {
+        try {
+          video.srcObject.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+      }
+
+      const constraintPresets = [
+        { video: { facingMode: { ideal: currentCameraFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: currentCameraFacing }, audio: false },
+        { video: true, audio: false }
+      ];
+
+      let stream = null;
+      let lastErr = null;
+
+      for (const c of constraintPresets) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(c);
+          if (stream) break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!stream) {
+        console.error("Camera access error:", lastErr);
+        if (window.location.protocol === "http:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+          showToast("⚠️ Chrome blocks camera on HTTP! Open HTTPS: https://trafficiq-edge-ai.vercel.app");
+        } else {
+          showToast("⚠️ Camera permission denied or webcam in use! Check browser permissions.");
+        }
+        return false;
+      }
+
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
+      try {
+        await video.play();
+      } catch (e) {
+        console.log("video.play error", e);
+      }
+
+      cameraTrack = stream.getVideoTracks()[0];
+      streamMode = "cam";
+      btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
+      btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
+      document.getElementById("streamModeBadge").textContent = `LIVE CAM (${currentCameraFacing.toUpperCase()})`;
+      showToast(`✓ Camera live! Point at oncoming traffic`);
+      return true;
+    }
+
     btnSim.addEventListener("click", () => {
       if (video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
@@ -1392,20 +1466,7 @@
     });
 
     btnCam.addEventListener("click", async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: currentCameraFacing } }
-        });
-        video.srcObject = stream;
-        cameraTrack = stream.getVideoTracks()[0];
-        streamMode = "cam";
-        btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
-        btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
-        document.getElementById("streamModeBadge").textContent = "LIVE STREET CAM";
-        showToast("✓ Connected Phone Camera Video Stream");
-      } catch (e) {
-        showToast("⚠️ Camera permission denied; continuing with Edge Simulator");
-      }
+      await startCameraStream();
     });
 
     const btnTripwire = document.getElementById("toggleTripwireVisibility");
