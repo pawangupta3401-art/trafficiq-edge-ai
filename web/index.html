@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TrafficIQ Edge AI — Enterprise ITS Traffic Surveying System</title>
+
+  <!-- Mobile App PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0B0F17">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bgDark: '#0B0F17',
+              bgLight: '#F8FAFC',
+              cardDark: '#131B26',
+              cardLight: '#FFFFFF',
+              elevatedDark: '#1A2536',
+              elevatedLight: '#F1F5F9',
+              borderDark: 'rgba(255, 255, 255, 0.08)',
+              borderLight: 'rgba(0, 0, 0, 0.12)',
+              cyan: '#00D2FF',
+              blue: '#2563EB',
+              amber: '#F59E0B',
+              danger: '#EF4444',
+              success: '#10B981',
+              bike: '#F59E0B',
+              car: '#00D2FF',
+              bus: '#10B981',
+              truck: '#EF4444'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Theme CSS Variables for High-Contrast Sunlight vs Control-Room Dark */
+    :root {
+      --bg-main: #0B0F17;
+      --card-main: #131B26;
+      --card-elevated: #1A2536;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --accent-cyan: #00D2FF;
+      --accent-amber: #F59E0B;
+      --accent-emerald: #10B981;
+      --accent-danger: #EF4444;
+      --glass-bg: rgba(15, 23, 42, 0.70);
+    }
+
+    html.light {
+      --bg-main: #F1F5F9;
+      --card-main: #FFFFFF;
+      --card-elevated: #F8FAFC;
+      --border-subtle: rgba(0, 0, 0, 0.14);
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --accent-cyan: #0284C7;
+      --accent-amber: #D97706;
+      --accent-emerald: #059669;
+      --accent-danger: #DC2626;
+      --glass-bg: rgba(255, 255, 255, 0.85);
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .glass-toolbar {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    html.light .glass-toolbar {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      color: #0F172A;
+    }
+
+    /* Gauge Segment Animations */
+    .gauge-circle {
+      transition: stroke-dashoffset 0.5s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    /* Spirit Level Bubble Container */
+    .spirit-level-container {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .spirit-bubble {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10B981;
+      position: absolute;
+      transition: transform 0.1s ease-out;
+      box-shadow: 0 0 6px #10B981;
+    }
+
+    /* Smooth Dragging Cursor */
+    .cursor-grab { cursor: grab; }
+    .cursor-grabbing { cursor: grabbing; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-main); }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen transition-colors duration-200">
+
+  <!-- ========================================================================= -->
+  <!-- 1. STICKY TOP TELEMETRY NAVIGATION HEADER                                  -->
+  <!-- ========================================================================= -->
+  <header class="sticky top-0 z-50 glass-panel border-b border-white/10 px-3 sm:px-6 py-2.5 flex items-center justify-between">
+    <!-- Brand & Junction Selector -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center font-black text-slate-950 text-base shadow-md shadow-cyan-500/20">
+        T
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <button id="btnOpenChowkModal" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 dark:bg-white/5 border border-white/10 hover:border-cyan-400/50 text-xs font-bold text-cyan-400 min-h-[36px]">
+            <span>📍</span>
+            <span id="currentChowkLabel" class="max-w-[130px] sm:max-w-[190px] truncate text-slate-100">Variety Square</span>
+            <span class="text-[10px] text-slate-400">▼</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- On-Ground Field Telemetry Pills (Battery, Temp, FPS, Theme Switcher) -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Device Health Status (Field Battery & Thermal Temperature) -->
+      <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-white/10 text-[11px] font-mono text-slate-300">
+        <span class="text-emerald-400">🔋 86%</span>
+        <span class="text-slate-500">•</span>
+        <span class="text-amber-400">34°C</span>
+      </div>
+
+      <!-- Live Edge Vision FPS Heartbeat Pill -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold tabular-nums min-h-[36px]">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="fpsDisplay">32 FPS</span>
+      </div>
+
+      <!-- One-Click PWA App Install Button -->
+      <button id="btnInstallApp" class="px-2.5 py-1.5 rounded-lg bg-brand-cyan/20 border border-brand-cyan/40 hover:bg-brand-cyan/30 text-xs font-bold flex items-center gap-1.5 text-brand-cyan min-h-[36px]" title="Install as Mobile App">
+        <span>📲</span>
+        <span class="inline" id="installBtnText">Install App</span>
+      </button>
+
+      <!-- High-Contrast Sunlight / Control-Room Dark Mode Toggle -->
+      <button id="btnToggleTheme" class="px-2.5 py-1.5 rounded-lg bg-brand-card border border-white/10 hover:border-amber-400/50 text-xs font-semibold flex items-center gap-1.5 text-amber-400 min-h-[36px] min-w-[36px]">
+        <span id="themeIcon">☀️</span>
+        <span class="hidden md:inline" id="themeText">Sunlight Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- 2. MAIN APPLICATION WORKSPACE (Desktop 65/35 & Mobile Field Layout)        -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 w-full max-w-[1720px] mx-auto p-3 sm:p-5 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+
+    <!-- ======================================================================= -->
+    <!-- LEFT COLUMN: 65% VIDEO CONTAINER, TRIPWIRE DRAGGER & CAMERA UTILITIES     -->
+    <!-- ======================================================================= -->
+    <div class="lg:col-span-8 flex flex-col gap-3">
+      <div class="relative w-full aspect-[16/9] lg:aspect-[16/9.5] rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl flex items-center justify-center">
+
+        <!-- Hidden Video for Camera Stream -->
+        <video id="webcamStream" playsinline autoplay muted class="hidden"></video>
+
+        <!-- Vision Canvas -->
+        <canvas id="visionCanvas" width="960" height="540" class="w-full h-full object-contain cursor-default"></canvas>
+
+        <!-- Dynamic Emergency Vehicle Alert Banner -->
+        <div id="emergencyVehicleAlert" class="absolute top-3 inset-x-4 px-3 py-1.5 rounded-xl bg-red-600/90 border border-red-400 text-white font-mono text-xs font-bold flex items-center justify-between shadow-lg shadow-red-500/30 transform -translate-y-16 opacity-0 transition-all duration-300 z-30 pointer-events-none">
+          <div class="flex items-center gap-2">
+            <span class="animate-bounce">🚨</span>
+            <span>EMERGENCY VEHICLE DETECTED (AMBULANCE / SIREN PROXY)</span>
+          </div>
+          <span class="text-[10px] bg-black/40 px-2 py-0.5 rounded">PRIORITY GREEN RECOMMENDATION</span>
+        </div>
+
+        <!-- Top Left Stream Status Overlay -->
+        <div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none z-20">
+          <div class="px-2.5 py-1 rounded-md bg-slate-950/85 backdrop-blur-md border border-white/10 text-[11px] font-mono flex items-center gap-1.5 text-slate-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span id="streamModeBadge">EDGE SIMULATOR</span>
+          </div>
+          <div class="px-2.5 py-1 rounded-md bg-slate-950/85 backdrop-blur-md border border-white/10 text-[11px] font-mono text-slate-300">
+            <span id="sessionTimerBadge">00:00:00</span>
+          </div>
+        </div>
+
+        <!-- Live Tripwire Calibration Angle & Height Badge (Shown during drag) -->
+        <div id="calibrationBadge" class="absolute top-12 left-3 px-3 py-1.5 rounded-lg bg-amber-500/90 text-slate-950 font-mono text-xs font-black shadow-lg shadow-amber-500/30 pointer-events-none opacity-0 transition-opacity z-20">
+          📐 TILT: <span id="calibAngle">0.0°</span> | Y: <span id="calibHeight">55%</span> | ROAD SLOPE: <span id="calibSlope">FLAT</span>
+        </div>
+
+        <!-- Ambient On-Field Camera Utilities Overlay (Lens Switcher, Torch, Spirit Level) -->
+        <div class="absolute top-3 right-3 flex items-center gap-2 z-20">
+          <!-- Mini Gyroscope / Spirit Level Bubble Gauge -->
+          <div class="spirit-level-container" title="Camera Horizon Level (Keep Bubble Centered)">
+            <div class="spirit-bubble" id="spiritBubble"></div>
+            <!-- Crosshairs -->
+            <div class="absolute w-full h-[0.5px] bg-white/30"></div>
+            <div class="absolute h-full w-[0.5px] bg-white/30"></div>
+          </div>
+
+          <!-- Flashlight / Torch Toggle -->
+          <button id="btnToggleTorch" class="w-9 h-9 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 hover:border-amber-400/50 flex items-center justify-center text-sm text-slate-300 transition-all" title="Toggle Flashlight / Torch">
+            <span id="torchIcon">🔦</span>
+          </button>
+
+          <!-- Camera Lens Switcher (Back / Front / Wide) -->
+          <button id="btnSwitchLens" class="h-9 px-2.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 hover:border-cyan-400/50 flex items-center gap-1 text-xs font-mono font-bold text-cyan-400 transition-all" title="Switch Camera Lens">
+            <span>📷</span>
+            <span id="lensLabel">BACK</span>
+          </button>
+        </div>
+
+        <!-- Floating Glassmorphism Player Controls Bar -->
+        <div class="absolute bottom-3 inset-x-3 sm:inset-x-6 glass-toolbar rounded-xl p-2 sm:p-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xl z-20">
+          <div class="flex items-center bg-slate-900/80 p-0.5 rounded-lg border border-white/10 text-xs">
+            <button id="toggleSimFeed" class="px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]">
+              Simulated Feed
+            </button>
+            <button id="toggleCamFeed" class="px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]">
+              Live Street Cam
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <button id="toggleTripwireVisibility" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold text-amber-400 min-h-[36px]">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>Tripwire: ON</span>
+            </button>
+
+            <!-- Reset Tripwire Calibration to default level -->
+            <button id="btnResetTripwire" class="px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-white/10 hover:border-cyan-400/50 text-xs font-semibold text-slate-300 min-h-[36px]">
+              Level Line
+            </button>
+
+            <!-- Pause / Play -->
+            <button id="togglePause" class="p-2 rounded-lg bg-slate-900/80 border border-white/10 hover:border-white/30 text-slate-300 min-h-[36px] min-w-[36px] flex items-center justify-center">
+              <svg id="iconPause" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Crossing Indicator Banner -->
+        <div id="crossingIndicatorBanner" class="absolute bottom-16 left-3 px-3 py-1 rounded-md bg-amber-500/20 border border-amber-400/40 text-[11px] font-mono text-amber-300 flex items-center gap-2 pointer-events-none opacity-0 transition-opacity duration-300 z-20">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span>1:1 DEDUPLICATED CROSSING</span>
+        </div>
+      </div>
+
+      <!-- Directional Flow & Congestion Guidance Bar (Desktop and Mobile) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+        <!-- Inbound Flow Indicator -->
+        <div class="p-2.5 rounded-xl bg-brand-card border border-white/10 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-400 font-semibold">Inbound:</span>
+          </div>
+          <div class="text-right font-mono font-bold text-emerald-400">
+            <span id="meterInboundCount">0</span>
+            <span class="text-[10px] text-slate-400" id="meterInboundRate">(0.0 v/m)</span>
+          </div>
+        </div>
+
+        <!-- Outbound Flow Indicator -->
+        <div class="p-2.5 rounded-xl bg-brand-card border border-white/10 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span class="text-slate-400 font-semibold">Outbound:</span>
+          </div>
+          <div class="text-right font-mono font-bold text-cyan-400">
+            <span id="meterOutboundCount">0</span>
+            <span class="text-[10px] text-slate-400" id="meterOutboundRate">(0.0 v/m)</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Congestion Status Badge -->
+        <div class="p-2.5 rounded-xl bg-brand-card border border-white/10 flex items-center justify-between">
+          <span class="text-slate-400 font-semibold">Congestion:</span>
+          <span id="congestionStatusBadge" class="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            FREE FLOW
+          </span>
+        </div>
+
+        <!-- Estimated Avg Speed Proxy -->
+        <div class="p-2.5 rounded-xl bg-brand-card border border-white/10 flex items-center justify-between">
+          <span class="text-slate-400 font-semibold">Avg Speed:</span>
+          <span class="font-mono font-bold text-slate-200">
+            <span id="lblAvgSpeed">38.4</span> <span class="text-[10px] text-slate-400">km/h</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- RIGHT COLUMN: ANALYTICS & ACTIONS / MOBILE 3-TAB BOTTOM SHEET             -->
+    <!-- ======================================================================= -->
+    <div class="lg:col-span-4 flex flex-col gap-3.5">
+
+      <!-- MOBILE ONLY: TAB NAVIGATION BAR (< 1024px) -->
+      <div class="lg:hidden flex items-center bg-brand-card border border-white/10 rounded-xl p-1 gap-1">
+        <button id="tabBtnMetrics" class="flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[44px]">
+          Live Split
+        </button>
+        <button id="tabBtnModalSplit" class="flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all min-h-[44px]">
+          Breakdown
+        </button>
+        <button id="tabBtnControls" class="flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all min-h-[44px]">
+          Survey & Sync
+        </button>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 1: LIVE METRICS, SPARKLINE CARDS & DONUT GAUGE                    -->
+      <!-- ===================================================================== -->
+      <div id="sectionMetrics" class="flex flex-col gap-3.5">
+        <!-- Metric Cards: Total Volume & PCU Load -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-brand-card border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Volume</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-semibold">LIVE</span>
+            </div>
+            <div class="flex items-baseline gap-2 mb-1">
+              <span id="metricTotalCount" class="text-3xl sm:text-4xl font-black text-white tabular-nums">0</span>
+              <span id="metricFlowRate" class="text-xs font-medium text-emerald-400 tabular-nums">0.0 v/m</span>
+            </div>
+            <!-- Sparkline Volume -->
+            <div class="w-full h-7 pt-1">
+              <svg id="sparklineVolume" class="w-full h-full overflow-visible" viewBox="0 0 100 28" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#00D2FF" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path id="sparklineVolArea" d="M 0 28 L 0 20 L 100 20 L 100 28 Z" fill="url(#volGrad)"/>
+                <path id="sparklineVolPath" d="M 0 20 Q 25 15, 50 18 T 100 12" fill="none" stroke="#00D2FF" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="bg-brand-card border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">PCU Load</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-semibold">IRC-67</span>
+            </div>
+            <div class="flex items-baseline gap-2 mb-1">
+              <span id="metricPcuLoad" class="text-3xl sm:text-4xl font-black text-amber-400 tabular-nums">0.0</span>
+              <span class="text-xs font-medium text-slate-400">Equiv</span>
+            </div>
+            <!-- Sparkline PCU -->
+            <div class="w-full h-7 pt-1">
+              <svg id="sparklinePcu" class="w-full h-full overflow-visible" viewBox="0 0 100 28" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="pcuGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path id="sparklinePcuArea" d="M 0 28 L 0 22 L 100 22 L 100 28 Z" fill="url(#pcuGrad)"/>
+                <path id="sparklinePcuPath" d="M 0 22 Q 25 18, 50 20 T 100 14" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Donut Chart / Semi-Radial Gauge Card -->
+        <div class="bg-brand-card border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col items-center">
+          <div class="w-full flex items-center justify-between mb-1">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Modal Split</h3>
+            <span class="text-[11px] font-mono text-cyan-400 font-semibold" id="dominantClassBadge">48% Two-Wheelers</span>
+          </div>
+
+          <div class="relative w-44 h-44 sm:w-48 sm:h-48 my-1 flex items-center justify-center">
+            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="#1E293B" stroke-width="12" />
+              <circle id="donutSegBike" class="gauge-circle" cx="60" cy="60" r="48" fill="none" stroke="#F59E0B" stroke-width="12" stroke-dasharray="301.59" stroke-dashoffset="150" />
+              <circle id="donutSegCar" class="gauge-circle" cx="60" cy="60" r="48" fill="none" stroke="#00D2FF" stroke-width="12" stroke-dasharray="301.59" stroke-dashoffset="301.59" />
+              <circle id="donutSegBus" class="gauge-circle" cx="60" cy="60" r="48" fill="none" stroke="#10B981" stroke-width="12" stroke-dasharray="301.59" stroke-dashoffset="301.59" />
+              <circle id="donutSegTruck" class="gauge-circle" cx="60" cy="60" r="48" fill="none" stroke="#EF4444" stroke-width="12" stroke-dasharray="301.59" stroke-dashoffset="301.59" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span id="donutCenterCount" class="text-2xl sm:text-3xl font-black text-white tabular-nums">0</span>
+              <span class="text-[10px] font-bold text-slate-400 tracking-wider">VEHICLES</span>
+            </div>
+          </div>
+
+          <!-- Donut Color Legends -->
+          <div class="w-full grid grid-cols-4 gap-1.5 text-center pt-2 border-t border-white/10 text-[11px]">
+            <div class="flex flex-col items-center">
+              <div class="flex items-center gap-1 font-semibold text-amber-400">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>Bike</span>
+              </div>
+              <span id="legendPctBike" class="tabular-nums font-mono text-slate-300">0%</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="flex items-center gap-1 font-semibold text-cyan-400">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span>Car</span>
+              </div>
+              <span id="legendPctCar" class="tabular-nums font-mono text-slate-300">0%</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="flex items-center gap-1 font-semibold text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Bus</span>
+              </div>
+              <span id="legendPctBus" class="tabular-nums font-mono text-slate-300">0%</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="flex items-center gap-1 font-semibold text-red-400">
+                <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                <span>Truck</span>
+              </div>
+              <span id="legendPctTruck" class="tabular-nums font-mono text-slate-300">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 2: VEHICLE CATEGORY BREAKDOWN ROWS & LINEAR PROGRESS BARS          -->
+      <!-- ===================================================================== -->
+      <div id="sectionModalSplit" class="flex flex-col gap-3">
+        <div class="bg-brand-card border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Classification Breakdown</h3>
+            <span class="text-[10px] font-mono text-slate-400">Deduplicated 1:1 Exit</span>
+          </div>
+
+          <!-- Two-Wheelers -->
+          <div class="bg-brand-elevated/70 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-sm">
+                  🏍️
+                </div>
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-slate-100">Two-Wheeler (Bike / Scooter)</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-500 text-white">45% MoRTH Risk</span>
+                  </div>
+                  <span class="text-[10px] text-slate-400 font-mono">Bikes, Mopeds, Scooters</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div id="rowBikeCount" class="text-base font-extrabold text-white tabular-nums">0</div>
+                <div id="rowBikePct" class="text-xs font-semibold text-amber-400 tabular-nums">0.0%</div>
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barBike" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Cars / Cabs / Auto -->
+          <div class="bg-brand-elevated/70 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-sm">
+                  🚗
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-slate-100">Car / Cab / Auto-Rickshaw</div>
+                  <span class="text-[10px] text-slate-400 font-mono">Sedans, Cabs, 3-Wheelers</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div id="rowCarCount" class="text-base font-extrabold text-white tabular-nums">0</div>
+                <div id="rowCarPct" class="text-xs font-semibold text-cyan-400 tabular-nums">0.0%</div>
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barCar" class="h-full bg-cyan-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Buses -->
+          <div class="bg-brand-elevated/70 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm">
+                  🚌
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-slate-100">Bus (City Bus / MSRTC)</div>
+                  <span class="text-[10px] text-slate-400 font-mono">Transit Aapli Bus, Coaches</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div id="rowBusCount" class="text-base font-extrabold text-white tabular-nums">0</div>
+                <div id="rowBusPct" class="text-xs font-semibold text-emerald-400 tabular-nums">0.0%</div>
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barBus" class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Trucks -->
+          <div class="bg-brand-elevated/70 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 text-sm">
+                  🚛
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-slate-100">Heavy Commercial / Trucks</div>
+                  <span class="text-[10px] text-slate-400 font-mono">Multi-Axle, Tippers, Lorries</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div id="rowTruckCount" class="text-base font-extrabold text-white tabular-nums">0</div>
+                <div id="rowTruckPct" class="text-xs font-semibold text-red-400 tabular-nums">0.0%</div>
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barTruck" class="h-full bg-red-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 3: SURVEY METADATA, EXPORT & CLOUD SYNC                           -->
+      <!-- ===================================================================== -->
+      <div id="sectionControls" class="flex flex-col gap-3">
+        <!-- Field Metadata Card (Officer ID, GPS Coordinates, Timestamp) -->
+        <div class="bg-brand-card border border-white/10 rounded-2xl p-4 flex flex-col gap-2 text-xs">
+          <div class="flex items-center justify-between pb-2 border-b border-white/10">
+            <span class="text-slate-400 font-bold uppercase tracking-wider text-[11px]">Survey Metadata</span>
+            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-bold">GPS LOCKED</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <div>
+              <span class="text-slate-500 block">OFFICER BADGE</span>
+              <span class="text-slate-200 font-bold" id="metaBadge">NTP-402 (NMC Traffic)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">COORDINATES</span>
+              <span class="text-cyan-400 font-bold">21.1458° N, 79.0882° E</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">ROAD CORRIDOR</span>
+              <span class="text-slate-200" id="metaRoad">MG Road / Amravati Rd</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">PILOT JURISDICTION</span>
+              <span class="text-slate-200" id="metaZone">Dharampeth Zone</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Button Actions Hierarchy -->
+        <div class="bg-brand-card border border-white/10 rounded-2xl p-4 flex flex-col gap-2.5">
+          <!-- Primary Action: Cloud Sync -->
+          <button id="btnSyncServerPrimary" class="w-full min-h-[48px] px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-cyan-400 hover:from-blue-500 hover:to-cyan-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-cyan-500/25 transition-all active:scale-[0.98]">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+            </svg>
+            <span id="btnSyncText">Sync to NMC Centre Server</span>
+          </button>
+
+          <!-- Secondary Action: Export CSV -->
+          <button id="btnExportCsvSecondary" class="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-brand-elevated border border-white/10 hover:border-cyan-400/50 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export CSV (For NMC Urban Planners)</span>
+          </button>
+
+          <!-- Ghost / Danger Action: Reset Counters with Safeguard -->
+          <button id="btnResetDanger" class="w-full min-h-[44px] px-4 py-2 rounded-xl text-red-400/80 hover:text-red-300 hover:bg-red-500/10 font-medium text-xs flex items-center justify-center gap-1.5 transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Reset Counters for Next Observation</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 3. CHOWK SELECTION MODAL                                                  -->
+  <!-- ========================================================================= -->
+  <div id="chowkModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+    <div class="bg-brand-card border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>📍</span> Select Monitoring Junction (Nagpur)
+        </h3>
+        <button id="btnCloseChowkModal" class="text-slate-400 hover:text-white p-1 text-lg leading-none min-h-[36px] min-w-[36px] flex items-center justify-center">&times;</button>
+      </div>
+      <div id="chowkListContainer" class="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Component -->
+  <div id="toastNotification" class="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-cyan-400/40 text-slate-100 text-xs font-semibold shadow-2xl transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toastIcon" class="text-cyan-400 text-sm">✓</span>
+    <span id="toastMsg">Telemetry synced to central server</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 4. JAVASCRIPT: VISION ENGINE, TOUCH CALIBRATION & ITS LOGIC               -->
+  <!-- ========================================================================= -->
+  <script>
+    // --- Data Models & Nagpur Junction Presets ---
+    const NAGPUR_JUNCTIONS = [
+      { name: "Variety Square", road: "MG Road / Amravati Rd", zone: "Dharampeth Zone", peakPcu: 4200 },
+      { name: "Sitabuldi Interchange", road: "Wardha Rd / Central Ave", zone: "Dhantoli Zone", peakPcu: 5800 },
+      { name: "Rahate Colony Chowk", road: "Wardha Road Corridor", zone: "Dhantoli Zone", peakPcu: 3900 },
+      { name: "Medical Square", road: "Medical College Rd / Ajni", zone: "Nehru Nagar Zone", peakPcu: 3600 },
+      { name: "Zero Mile Square", road: "Station Road / Wardha Rd", zone: "Civil Lines", peakPcu: 4100 },
+      { name: "Manewada Chowk", road: "Nagpur Outer Ring Road", zone: "Hanuman Nagar Zone", peakPcu: 3400 },
+      { name: "Sadar Residency Road", road: "Residency Rd / Mount Rd", zone: "Mangalwari Zone", peakPcu: 2800 },
+      { name: "RBI Square", road: "Kingsway / Station Approach", zone: "Civil Lines", peakPcu: 3200 }
+    ];
+
+    let currentJunction = NAGPUR_JUNCTIONS[0];
+    let sessionStartTime = Date.now();
+    let isPaused = false;
+    let streamMode = "sim"; // 'sim' or 'cam'
+    let currentCameraFacing = "environment"; // 'environment' or 'user'
+    let torchActive = false;
+    let cameraTrack = null;
+    let isHighContrastSunlight = false;
+
+    // Vehicle Counts State
+    let counts = { bike: 0, car: 0, bus: 0, truck: 0, inbound: 0, outbound: 0 };
+    let volumeHistory = [4, 6, 8, 12, 15, 18, 22, 25, 29, 34, 38, 42, 45, 50, 56];
+    let pcuHistory = [3.2, 4.5, 6.8, 8.5, 11.2, 14.0, 17.5, 20.2, 23.5, 28.0, 31.2, 34.5, 38.0, 42.1, 46.5];
+
+    let nextTrackId = 101;
+    let activeVehicles = [];
+    let lastCrossedTimestamp = 0;
+
+    // --- Interactive Touch-Calibrated Tripwire Anchors ---
+    // Start and End Points in Canvas Space (960 x 540)
+    let p1 = { x: 960 * 0.08, y: 540 * 0.55 };
+    let p2 = { x: 960 * 0.92, y: 540 * 0.55 };
+    let draggingHandle = null; // 'p1', 'p2', or 'line'
+    let dragStartPos = { x: 0, y: 0 };
+    let origP1 = { ...p1 };
+    let origP2 = { ...p2 };
+    let showTripwire = true;
+
+    // Web Audio Synthesizer for tripwire chime
+    let audioContext = null;
+    function playTripwireChime() {
+      try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') audioContext.resume();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, audioContext.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, audioContext.currentTime + 0.10);
+        gain.gain.setValueAtTime(0.12, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.10);
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.11);
+      } catch (e) {}
+    }
+
+    const canvas = document.getElementById("visionCanvas");
+    const ctx = canvas.getContext("2d");
+    const video = document.getElementById("webcamStream");
+
+    // Spawn realistic Indian vehicle entity
+    function spawnVehicle() {
+      const roll = Math.random();
+      let type, color, width, height, speedY;
+
+      // Realistic Nagpur Traffic Mix: 48% Two-Wheelers, 34% Cars/Autos, 10% Buses, 8% Commercial
+      if (roll < 0.48) {
+        type = "BIKE"; color = "#F59E0B"; width = 38; height = 56; speedY = 2.4 + Math.random() * 1.5;
+      } else if (roll < 0.82) {
+        type = "CAR"; color = "#00D2FF"; width = 70; height = 96; speedY = 2.0 + Math.random() * 0.9;
+      } else if (roll < 0.92) {
+        type = "BUS"; color = "#10B981"; width = 92; height = 140; speedY = 1.4 + Math.random() * 0.4;
+      } else {
+        type = "TRUCK"; color = "#EF4444"; width = 98; height = 148; speedY = 1.3 + Math.random() * 0.3;
+      }
+
+      const lane = Math.floor(Math.random() * 4);
+      const laneX = (canvas.width * 0.14) + (lane * (canvas.width * 0.185)) + (Math.random() * 20 - 10);
+
+      const isEmergency = (Math.random() < 0.03 && type === "CAR"); // Occasional ambulance / siren emergency vehicle
+      if (isEmergency) color = "#FF0055";
+
+      activeVehicles.push({
+        id: nextTrackId++,
+        type, color, x: laneX, y: -160, width, height, speedY,
+        history: [{ x: laneX + width / 2, y: -160 + height / 2 }],
+        hasCrossed: false,
+        confidence: 0.88 + Math.random() * 0.10,
+        isEmergency
+      });
+    }
+
+    for (let i = 0; i < 4; i++) {
+      spawnVehicle();
+      activeVehicles[i].y = 80 + i * 110;
+    }
+
+    // =========================================================================
+    // 2D LINE INTERSECTION & DIRECTIONAL MATH FOR TILTED TRIPWIRE               //
+    // =========================================================================
+    function checkSegmentsIntersect(pA, pB, pC, pD) {
+      function ccw(pX, pY, pZ) {
+        return (pZ.y - pX.y) * (pY.x - pX.x) > (pY.y - pX.y) * (pZ.x - pX.x);
+      }
+      return (ccw(pA, pC, pD) !== ccw(pB, pC, pD)) && (ccw(pA, pB, pC) !== ccw(pA, pB, pD));
+    }
+
+    function getCrossProductDirection(pPrev, pCurr, lineP1, lineP2) {
+      // Normal vector of line (P1 -> P2)
+      const nx = -(lineP2.y - lineP1.y);
+      const ny = (lineP2.x - lineP1.x);
+      // Motion vector
+      const vx = pCurr.x - pPrev.x;
+      const vy = pCurr.y - pPrev.y;
+      const dot = vx * nx + vy * ny;
+      return dot > 0 ? "INBOUND" : "OUTBOUND";
+    }
+
+    // =========================================================================
+    // RENDER LOOP & VISION DRAWING                                             //
+    // =========================================================================
+    let lastTime = performance.now();
+    let frameCount = 0;
+
+    function renderFrame(now) {
+      const dt = now - lastTime;
+      lastTime = now;
+      frameCount++;
+
+      if (frameCount % 12 === 0) {
+        const instantFps = Math.min(Math.round(1000 / (dt || 30)), 60);
+        document.getElementById("fpsDisplay").textContent = `${instantFps.toFixed(0)} FPS`;
+      }
+
+      if (!isPaused) {
+        drawRoad();
+
+        if (streamMode === "cam" && video.readyState >= 2) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Draw Interactive Tripwire Line & Touch Handles
+        if (showTripwire) {
+          drawInteractiveTripwire();
+        }
+
+        const toRemove = [];
+
+        for (let i = 0; i < activeVehicles.length; i++) {
+          const v = activeVehicles[i];
+          const prevPos = { x: v.x + v.width / 2, y: v.y + v.height / 2 };
+          v.y += v.speedY;
+          const currPos = { x: v.x + v.width / 2, y: v.y + v.height / 2 };
+
+          v.history.push(currPos);
+          if (v.history.length > 18) v.history.shift();
+
+          // Check Line Intersection against Tilted / Rotated Tripwire
+          if (showTripwire && !v.hasCrossed && checkSegmentsIntersect(prevPos, currPos, p1, p2)) {
+            v.hasCrossed = true;
+            lastCrossedTimestamp = Date.now();
+            playTripwireChime();
+
+            const dir = getCrossProductDirection(prevPos, currPos, p1, p2);
+            if (dir === "INBOUND") counts.inbound++;
+            else counts.outbound++;
+
+            if (v.type === "BIKE") counts.bike++;
+            else if (v.type === "CAR") counts.car++;
+            else if (v.type === "BUS") counts.bus++;
+            else if (v.type === "TRUCK") counts.truck++;
+
+            // Emergency siren proxy alert
+            if (v.isEmergency) {
+              const alertBox = document.getElementById("emergencyVehicleAlert");
+              alertBox.classList.remove("-translate-y-16", "opacity-0");
+              setTimeout(() => alertBox.classList.add("-translate-y-16", "opacity-0"), 4000);
+            }
+
+            const banner = document.getElementById("crossingIndicatorBanner");
+            banner.classList.remove("opacity-0");
+            setTimeout(() => banner.classList.add("opacity-0"), 500);
+
+            updateAnalytics();
+          }
+
+          drawVehicle(v);
+
+          if (v.y > canvas.height + 120) {
+            toRemove.push(i);
+          }
+        }
+
+        for (let i = toRemove.length - 1; i >= 0; i--) {
+          activeVehicles.splice(toRemove[i], 1);
+        }
+
+        if (streamMode === "sim" && activeVehicles.length < 5 && Math.random() < 0.04) {
+          spawnVehicle();
+        }
+      }
+
+      requestAnimationFrame(renderFrame);
+    }
+
+    function drawRoad() {
+      ctx.fillStyle = isHighContrastSunlight ? "#E2E8F0" : "#070A0F";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const roadLeft = canvas.width * 0.10;
+      const roadWidth = canvas.width * 0.80;
+
+      ctx.fillStyle = isHighContrastSunlight ? "#CBD5E1" : "#111827";
+      ctx.fillRect(roadLeft, 0, roadWidth, canvas.height);
+
+      ctx.strokeStyle = isHighContrastSunlight ? "#94A3B8" : "#1E293B";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(roadLeft, 0, roadWidth, canvas.height);
+
+      ctx.strokeStyle = isHighContrastSunlight ? "rgba(0, 0, 0, 0.25)" : "rgba(255, 255, 255, 0.12)";
+      ctx.setLineDash([20, 16]);
+      ctx.lineWidth = 2;
+
+      for (let lane = 1; lane < 4; lane++) {
+        const laneX = roadLeft + (lane * (roadWidth / 4));
+        ctx.beginPath();
+        ctx.moveTo(laneX, 0);
+        ctx.lineTo(laneX, canvas.height);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    function drawInteractiveTripwire() {
+      const isCrossed = (Date.now() - lastCrossedTimestamp) < 350;
+
+      // Glow on trigger
+      if (isCrossed) {
+        ctx.shadowColor = "#00D2FF";
+        ctx.shadowBlur = 24;
+        ctx.strokeStyle = "rgba(0, 210, 255, 0.9)";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Dashed Tripwire Line
+      ctx.strokeStyle = isCrossed ? "#FFFFFF" : "#F59E0B";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([14, 8]);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw Center Directional Indicator
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      ctx.fillStyle = isCrossed ? "#00D2FF" : "#F59E0B";
+      ctx.beginPath();
+      ctx.arc(midX, midY, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      ctx.fillStyle = isCrossed ? "#00D2FF" : (isHighContrastSunlight ? "#B45309" : "#F59E0B");
+      ctx.fillText("COUNTING TRIPWIRE (TOUCH DRAGGABLE)", p1.x + 20, p1.y - 12);
+
+      // --- Draw 44x44px Anchor Touch Handles on Both Ends ---
+      drawAnchorHandle(p1.x, p1.y, draggingHandle === 'p1');
+      drawAnchorHandle(p2.x, p2.y, draggingHandle === 'p2');
+    }
+
+    function drawAnchorHandle(x, y, isHovered) {
+      // Outer 44px Touch Target Zone (Semi-transparent circle)
+      ctx.fillStyle = isHovered ? "rgba(0, 210, 255, 0.35)" : "rgba(245, 158, 11, 0.25)";
+      ctx.beginPath();
+      ctx.arc(x, y, 22, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Solid Handle Center
+      ctx.fillStyle = isHovered ? "#00D2FF" : "#F59E0B";
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White inner core
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Ring border
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawVehicle(v) {
+      if (v.history.length > 1) {
+        ctx.strokeStyle = v.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < v.history.length; i++) {
+          const pt = v.history[i];
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.globalAlpha = 0.35;
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      }
+
+      ctx.fillStyle = v.color + "18";
+      ctx.fillRect(v.x, v.y, v.width, v.height);
+      ctx.strokeStyle = v.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(v.x, v.y, v.width, v.height);
+
+      // AI HUD Corner Brackets
+      const bLen = Math.min(v.width * 0.28, 14);
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 2.5;
+
+      ctx.beginPath(); ctx.moveTo(v.x, v.y + bLen); ctx.lineTo(v.x, v.y); ctx.lineTo(v.x + bLen, v.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(v.x + v.width - bLen, v.y); ctx.lineTo(v.x + v.width, v.y); ctx.lineTo(v.x + v.width, v.y + bLen); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(v.x, v.y + v.height - bLen); ctx.lineTo(v.x, v.y + v.height); ctx.lineTo(v.x + bLen, v.y + v.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(v.x + v.width - bLen, v.y + v.height); ctx.lineTo(v.x + v.width, v.y + v.height); ctx.lineTo(v.x + v.width, v.y + v.height - bLen); ctx.stroke();
+
+      ctx.fillStyle = v.hasCrossed ? "#10B981" : "#FFFFFF";
+      ctx.beginPath();
+      ctx.arc(v.x + v.width / 2, v.y + v.height / 2, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      const label = `${v.isEmergency ? 'AMBULANCE' : v.type} #${v.id} ${(v.confidence * 100).toFixed(0)}%`;
+      ctx.font = "bold 11px 'Inter', sans-serif";
+      const txtWidth = ctx.measureText(label).width;
+
+      ctx.fillStyle = v.color;
+      ctx.fillRect(v.x, v.y - 19, txtWidth + 10, 19);
+      ctx.fillStyle = "#0B0F17";
+      ctx.fillText(label, v.x + 5, v.y - 5);
+    }
+
+    // =========================================================================
+    // TOUCH & MOUSE GESTURE HANDLERS FOR CALIBRATING TRIPWIRE                   //
+    // =========================================================================
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    function dist(pA, pB) {
+      return Math.hypot(pA.x - pB.x, pA.y - pB.y);
+    }
+
+    function pointToSegmentDistance(p, a, b) {
+      const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+      if (l2 === 0) return dist(p, a);
+      let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return dist(p, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+    }
+
+    function handleDragStart(pos) {
+      if (dist(pos, p1) <= 32) {
+        draggingHandle = 'p1';
+      } else if (dist(pos, p2) <= 32) {
+        draggingHandle = 'p2';
+      } else if (pointToSegmentDistance(pos, p1, p2) <= 24) {
+        draggingHandle = 'line';
+        dragStartPos = pos;
+        origP1 = { ...p1 };
+        origP2 = { ...p2 };
+      }
+
+      if (draggingHandle) {
+        document.getElementById("calibrationBadge").classList.remove("opacity-0");
+        updateCalibrationBadge();
+      }
+    }
+
+    function handleDragMove(pos) {
+      if (!draggingHandle) return;
+
+      if (draggingHandle === 'p1') {
+        p1.x = Math.max(20, Math.min(canvas.width - 20, pos.x));
+        p1.y = Math.max(40, Math.min(canvas.height - 40, pos.y));
+      } else if (draggingHandle === 'p2') {
+        p2.x = Math.max(20, Math.min(canvas.width - 20, pos.x));
+        p2.y = Math.max(40, Math.min(canvas.height - 40, pos.y));
+      } else if (draggingHandle === 'line') {
+        const dx = pos.x - dragStartPos.x;
+        const dy = pos.y - dragStartPos.y;
+        p1.x = Math.max(20, Math.min(canvas.width - 20, origP1.x + dx));
+        p1.y = Math.max(40, Math.min(canvas.height - 40, origP1.y + dy));
+        p2.x = Math.max(20, Math.min(canvas.width - 20, origP2.x + dx));
+        p2.y = Math.max(40, Math.min(canvas.height - 40, origP2.y + dy));
+      }
+
+      updateCalibrationBadge();
+    }
+
+    function handleDragEnd() {
+      if (draggingHandle) {
+        draggingHandle = null;
+        document.getElementById("calibrationBadge").classList.add("opacity-0");
+        showToast("📍 Tripwire calibrated to lane geometry");
+      }
+    }
+
+    function updateCalibrationBadge() {
+      const dy = p2.y - p1.y;
+      const dx = p2.x - p1.x;
+      const angleDeg = (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(1);
+      const avgY = ((p1.y + p2.y) / 2 / canvas.height * 100).toFixed(0);
+
+      document.getElementById("calibAngle").textContent = `${angleDeg}°`;
+      document.getElementById("calibHeight").textContent = `${avgY}%`;
+      document.getElementById("calibSlope").textContent = Math.abs(parseFloat(angleDeg)) < 3 ? "LEVEL" : (dy > 0 ? "SLANTED RIGHT" : "SLANTED LEFT");
+    }
+
+    // Touch Event Listeners
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      handleDragStart(getCanvasCoords(e));
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      handleDragMove(getCanvasCoords(e));
+    }, { passive: false });
+
+    canvas.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      handleDragEnd();
+    }, { passive: false });
+
+    // Mouse Event Listeners
+    canvas.addEventListener("mousedown", (e) => handleDragStart(getCanvasCoords(e)));
+    window.addEventListener("mousemove", (e) => {
+      if (draggingHandle) handleDragMove(getCanvasCoords(e));
+    });
+    window.addEventListener("mouseup", handleDragEnd);
+
+    // =========================================================================
+    // FIELD CAMERA UTILITIES: LENS SWITCH, TORCH & SPIRIT LEVEL GYRO            //
+    // =========================================================================
+    // Flashlight / Torch Toggle
+    document.getElementById("btnToggleTorch").addEventListener("click", async () => {
+      torchActive = !torchActive;
+      const btn = document.getElementById("btnToggleTorch");
+
+      if (cameraTrack && typeof cameraTrack.applyConstraints === 'function') {
+        try {
+          await cameraTrack.applyConstraints({ advanced: [{ torch: torchActive }] });
+        } catch (e) {}
+      }
+
+      if (torchActive) {
+        btn.classList.add("border-amber-400", "bg-amber-400/20", "text-amber-400");
+        showToast("🔦 Camera Flashlight / Torch Activated");
+      } else {
+        btn.classList.remove("border-amber-400", "bg-amber-400/20", "text-amber-400");
+        showToast("🔦 Flashlight Off");
+      }
+    });
+
+    // Lens Switcher (Back / Front / Wide)
+    document.getElementById("btnSwitchLens").addEventListener("click", async () => {
+      currentCameraFacing = (currentCameraFacing === "environment") ? "user" : "environment";
+      document.getElementById("lensLabel").textContent = currentCameraFacing === "environment" ? "BACK" : "FRONT";
+
+      if (streamMode === "cam") {
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(t => t.stop());
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: currentCameraFacing } }
+          });
+          video.srcObject = stream;
+          cameraTrack = stream.getVideoTracks()[0];
+          showToast(`📷 Switched to ${currentCameraFacing.toUpperCase()} camera`);
+        } catch (e) {
+          showToast("⚠️ Could not switch camera lens");
+        }
+      } else {
+        showToast(`📷 Target lens set to ${currentCameraFacing.toUpperCase()} (Activates in live camera mode)`);
+      }
+    });
+
+    // Real-Time Spirit Level (DeviceOrientation / Pitch & Roll)
+    const spiritBubble = document.getElementById("spiritBubble");
+    let bubbleX = 0;
+    let bubbleY = 0;
+
+    window.addEventListener("deviceorientation", (e) => {
+      if (e.gamma !== null && e.beta !== null) {
+        // gamma is left-to-right tilt in degrees [-90 to 90]
+        // beta is front-to-back tilt in degrees [-180 to 180]
+        const tiltX = Math.max(-12, Math.min(12, e.gamma / 2));
+        const tiltY = Math.max(-12, Math.min(12, (e.beta - 75) / 2)); // 75 deg is typical surveying phone pitch
+        spiritBubble.style.transform = `translate(${tiltX}px, ${tiltY}px)`;
+        spiritBubble.style.backgroundColor = (Math.abs(tiltX) < 3 && Math.abs(tiltY) < 3) ? "#10B981" : "#EF4444";
+      }
+    });
+
+    // Simulation fallback for Spirit Level on desktop
+    setInterval(() => {
+      if (!window.DeviceOrientationEvent || Math.random() < 0.2) {
+        const driftX = (Math.sin(Date.now() / 1500) * 3);
+        const driftY = (Math.cos(Date.now() / 1800) * 2);
+        spiritBubble.style.transform = `translate(${driftX}px, ${driftY}px)`;
+        spiritBubble.style.backgroundColor = "#10B981";
+      }
+    }, 150);
+
+    // =========================================================================
+    // HIGH-CONTRAST SUNLIGHT MODE VS CONTROL-ROOM DARK MODE                    //
+    // =========================================================================
+    document.getElementById("btnToggleTheme").addEventListener("click", () => {
+      isHighContrastSunlight = !isHighContrastSunlight;
+      const html = document.documentElement;
+
+      if (isHighContrastSunlight) {
+        html.classList.remove("dark");
+        html.classList.add("light");
+        document.getElementById("themeIcon").textContent = "🌙";
+        document.getElementById("themeText").textContent = "Dark Mode";
+        showToast("☀️ Activated High-Contrast Sunlight Mode (Field Readability)");
+      } else {
+        html.classList.remove("light");
+        html.classList.add("dark");
+        document.getElementById("themeIcon").textContent = "☀️";
+        document.getElementById("themeText").textContent = "Sunlight Mode";
+        showToast("🌙 Activated Control-Room Dark Mode");
+      }
+    });
+
+    // Reset Tripwire to horizontal
+    document.getElementById("btnResetTripwire").addEventListener("click", () => {
+      p1 = { x: canvas.width * 0.08, y: canvas.height * 0.55 };
+      p2 = { x: canvas.width * 0.92, y: canvas.height * 0.55 };
+      showToast("📍 Counting tripwire re-centered to 55% level");
+    });
+
+    // =========================================================================
+    // PERCENTAGE CALCULATION, DONUT GAUGE & SPARKLINE UPDATE LOGIC            //
+    // =========================================================================
+    function updateAnalytics() {
+      const total = counts.bike + counts.car + counts.bus + counts.truck;
+      const safeTotal = Math.max(total, 1);
+
+      // PCU factor: Bike 0.5, Car 1.0, Bus 3.0, Truck 3.0
+      const pcu = (counts.bike * 0.5) + (counts.car * 1.0) + (counts.bus * 3.0) + (counts.truck * 3.0);
+
+      // Percentage splits
+      const pctBike = ((counts.bike / safeTotal) * 100);
+      const pctCar = ((counts.car / safeTotal) * 100);
+      const pctBus = ((counts.bus / safeTotal) * 100);
+      const pctTruck = ((counts.truck / safeTotal) * 100);
+
+      // Flow rate
+      const elapsedMin = Math.max((Date.now() - sessionStartTime) / 60000, 0.1);
+      const vpm = (total / elapsedMin);
+
+      // Dynamic Congestion Status Logic
+      const pcuRate = pcu / elapsedMin;
+      const badge = document.getElementById("congestionStatusBadge");
+      if (pcuRate < 35) {
+        badge.textContent = "FREE FLOW";
+        badge.className = "px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+      } else if (pcuRate <= 75) {
+        badge.textContent = "MODERATE DENSITY";
+        badge.className = "px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-amber-500/15 text-amber-400 border border-amber-500/30";
+      } else {
+        badge.textContent = "BOTTLENECK / JAM";
+        badge.className = "px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-red-500/15 text-red-400 border border-red-500/30";
+      }
+
+      // Update Inbound / Outbound Directional Meters
+      document.getElementById("meterInboundCount").textContent = counts.inbound;
+      document.getElementById("meterInboundRate").textContent = `(${(counts.inbound / elapsedMin).toFixed(1)} v/m)`;
+      document.getElementById("meterOutboundCount").textContent = counts.outbound;
+      document.getElementById("meterOutboundRate").textContent = `(${(counts.outbound / elapsedMin).toFixed(1)} v/m)`;
+
+      // Update Top Metrics
+      document.getElementById("metricTotalCount").textContent = total;
+      document.getElementById("metricFlowRate").textContent = `${vpm.toFixed(1)} v/m`;
+      document.getElementById("metricPcuLoad").textContent = pcu.toFixed(1);
+      document.getElementById("donutCenterCount").textContent = total;
+      document.getElementById("dominantClassBadge").textContent = `${pctBike.toFixed(1)}% Two-Wheelers`;
+
+      // Donut Chart Segments (Circumference of r=48 is 2 * π * 48 = 301.59)
+      const CIRCUMFERENCE = 301.59;
+      const arcBike = (pctBike / 100) * CIRCUMFERENCE;
+      const arcCar = (pctCar / 100) * CIRCUMFERENCE;
+      const arcBus = (pctBus / 100) * CIRCUMFERENCE;
+      const arcTruck = (pctTruck / 100) * CIRCUMFERENCE;
+
+      const segBike = document.getElementById("donutSegBike");
+      const segCar = document.getElementById("donutSegCar");
+      const segBus = document.getElementById("donutSegBus");
+      const segTruck = document.getElementById("donutSegTruck");
+
+      segBike.setAttribute("stroke-dasharray", `${arcBike} ${CIRCUMFERENCE}`);
+      segBike.setAttribute("stroke-dashoffset", "0");
+
+      segCar.setAttribute("stroke-dasharray", `${arcCar} ${CIRCUMFERENCE}`);
+      segCar.setAttribute("stroke-dashoffset", `${-arcBike}`);
+
+      segBus.setAttribute("stroke-dasharray", `${arcBus} ${CIRCUMFERENCE}`);
+      segBus.setAttribute("stroke-dashoffset", `${-(arcBike + arcCar)}`);
+
+      segTruck.setAttribute("stroke-dasharray", `${arcTruck} ${CIRCUMFERENCE}`);
+      segTruck.setAttribute("stroke-dashoffset", `${-(arcBike + arcCar + arcBus)}`);
+
+      document.getElementById("legendPctBike").textContent = `${pctBike.toFixed(0)}%`;
+      document.getElementById("legendPctCar").textContent = `${pctCar.toFixed(0)}%`;
+      document.getElementById("legendPctBus").textContent = `${pctBus.toFixed(0)}%`;
+      document.getElementById("legendPctTruck").textContent = `${pctTruck.toFixed(0)}%`;
+
+      document.getElementById("rowBikeCount").textContent = counts.bike;
+      document.getElementById("rowBikePct").textContent = `${pctBike.toFixed(1)}%`;
+      document.getElementById("barBike").style.width = `${pctBike}%`;
+
+      document.getElementById("rowCarCount").textContent = counts.car;
+      document.getElementById("rowCarPct").textContent = `${pctCar.toFixed(1)}%`;
+      document.getElementById("barCar").style.width = `${pctCar}%`;
+
+      document.getElementById("rowBusCount").textContent = counts.bus;
+      document.getElementById("rowBusPct").textContent = `${pctBus.toFixed(1)}%`;
+      document.getElementById("barBus").style.width = `${pctBus}%`;
+
+      document.getElementById("rowTruckCount").textContent = counts.truck;
+      document.getElementById("rowTruckPct").textContent = `${pctTruck.toFixed(1)}%`;
+      document.getElementById("barTruck").style.width = `${pctTruck}%`;
+
+      volumeHistory.push(total);
+      if (volumeHistory.length > 15) volumeHistory.shift();
+
+      pcuHistory.push(parseFloat(pcu.toFixed(1)));
+      if (pcuHistory.length > 15) pcuHistory.shift();
+
+      renderSparklines();
+    }
+
+    function renderSparklines() {
+      function buildSvgPath(data) {
+        const max = Math.max(...data, 1);
+        const min = Math.min(...data, 0);
+        const range = max - min || 1;
+
+        const points = data.map((val, idx) => {
+          const x = (idx / (data.length - 1)) * 100;
+          const y = 26 - ((val - min) / range) * 22;
+          return { x, y };
+        });
+
+        let lineD = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < points.length; i++) {
+          lineD += ` L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)}`;
+        }
+        const areaD = `${lineD} L 100 28 L 0 28 Z`;
+        return { lineD, areaD };
+      }
+
+      const volSvg = buildSvgPath(volumeHistory);
+      document.getElementById("sparklineVolPath").setAttribute("d", volSvg.lineD);
+      document.getElementById("sparklineVolArea").setAttribute("d", volSvg.areaD);
+
+      const pcuSvg = buildSvgPath(pcuHistory);
+      document.getElementById("sparklinePcuPath").setAttribute("d", pcuSvg.lineD);
+      document.getElementById("sparklinePcuArea").setAttribute("d", pcuSvg.areaD);
+    }
+
+    // Session Timer
+    setInterval(() => {
+      if (!isPaused) {
+        const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const h = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
+        const s = String(elapsedSec % 60).padStart(2, '0');
+        document.getElementById("sessionTimerBadge").textContent = `${h}:${m}:${s}`;
+      }
+    }, 1000);
+
+    // Feed switch
+    const btnSim = document.getElementById("toggleSimFeed");
+    const btnCam = document.getElementById("toggleCamFeed");
+
+    btnSim.addEventListener("click", () => {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+      }
+      streamMode = "sim";
+      btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
+      btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
+      document.getElementById("streamModeBadge").textContent = "EDGE SIMULATOR";
+      showToast("✓ Activated Edge Traffic Simulator");
+    });
+
+    btnCam.addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: currentCameraFacing } }
+        });
+        video.srcObject = stream;
+        cameraTrack = stream.getVideoTracks()[0];
+        streamMode = "cam";
+        btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
+        btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
+        document.getElementById("streamModeBadge").textContent = "LIVE STREET CAM";
+        showToast("✓ Connected Phone Camera Video Stream");
+      } catch (e) {
+        showToast("⚠️ Camera permission denied; continuing with Edge Simulator");
+      }
+    });
+
+    const btnTripwire = document.getElementById("toggleTripwireVisibility");
+    btnTripwire.addEventListener("click", () => {
+      showTripwire = !showTripwire;
+      btnTripwire.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${showTripwire ? 'bg-amber-400' : 'bg-slate-500'}"></span>
+        <span>Tripwire: ${showTripwire ? 'ON' : 'OFF'}</span>
+      `;
+      btnTripwire.className = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold ${showTripwire ? 'text-amber-400' : 'text-slate-400'} transition-all min-h-[36px]`;
+      showToast(`📍 Counting Tripwire ${showTripwire ? 'Enabled' : 'Disabled'}`);
+    });
+
+    const btnPause = document.getElementById("togglePause");
+    btnPause.addEventListener("click", () => {
+      isPaused = !isPaused;
+      document.getElementById("iconPause").innerHTML = isPaused
+        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />'
+        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />';
+      showToast(isPaused ? "⏸ Stream Paused" : "▶ Stream Resumed");
+    });
+
+    // =========================================================================
+    // MOBILE 3-TAB BOTTOM SHEET (< 1024px)                                     //
+    // =========================================================================
+    const tabBtnMetrics = document.getElementById("tabBtnMetrics");
+    const tabBtnModalSplit = document.getElementById("tabBtnModalSplit");
+    const tabBtnControls = document.getElementById("tabBtnControls");
+    const secMetrics = document.getElementById("sectionMetrics");
+    const secModalSplit = document.getElementById("sectionModalSplit");
+    const secControls = document.getElementById("sectionControls");
+
+    function setMobileTab(activeTab) {
+      if (window.innerWidth >= 1024) {
+        secMetrics.classList.remove("hidden");
+        secModalSplit.classList.remove("hidden");
+        secControls.classList.remove("hidden");
+        return;
+      }
+
+      tabBtnMetrics.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all min-h-[44px]";
+      tabBtnModalSplit.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all min-h-[44px]";
+      tabBtnControls.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all min-h-[44px]";
+
+      secMetrics.classList.add("hidden");
+      secModalSplit.classList.add("hidden");
+      secControls.classList.add("hidden");
+
+      if (activeTab === "metrics") {
+        tabBtnMetrics.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[44px]";
+        secMetrics.classList.remove("hidden");
+      } else if (activeTab === "modalSplit") {
+        tabBtnModalSplit.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[44px]";
+        secModalSplit.classList.remove("hidden");
+      } else if (activeTab === "controls") {
+        tabBtnControls.className = "flex-1 py-2.5 rounded-lg text-xs font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[44px]";
+        secControls.classList.remove("hidden");
+      }
+    }
+
+    tabBtnMetrics.addEventListener("click", () => setMobileTab("metrics"));
+    tabBtnModalSplit.addEventListener("click", () => setMobileTab("modalSplit"));
+    tabBtnControls.addEventListener("click", () => setMobileTab("controls"));
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1024) {
+        secMetrics.classList.remove("hidden");
+        secModalSplit.classList.remove("hidden");
+        secControls.classList.remove("hidden");
+      } else {
+        setMobileTab("metrics");
+      }
+    });
+
+    if (window.innerWidth < 1024) {
+      setMobileTab("metrics");
+    }
+
+    // =========================================================================
+    // BUTTON ACTIONS HIERARCHY: SYNC, EXPORT & SAFEGUARD RESET                 //
+    // =========================================================================
+    document.getElementById("btnSyncServerPrimary").addEventListener("click", () => {
+      const btn = document.getElementById("btnSyncServerPrimary");
+      const txt = document.getElementById("btnSyncText");
+      btn.disabled = true;
+      txt.textContent = "Transmitting JSON Telemetry to NMC Server...";
+
+      setTimeout(() => {
+        txt.textContent = "✓ Telemetry Synced with Smart City Dashboard";
+        btn.classList.remove("from-blue-600", "via-cyan-500", "to-cyan-400");
+        btn.classList.add("from-emerald-600", "to-emerald-400");
+        showToast("✓ Batch summary synced with NMC Smart City Central Server");
+
+        setTimeout(() => {
+          txt.textContent = "Sync to NMC Centre Server";
+          btn.classList.remove("from-emerald-600", "to-emerald-400");
+          btn.classList.add("from-blue-600", "via-cyan-500", "to-cyan-400");
+          btn.disabled = false;
+        }, 3000);
+      }, 950);
+    });
+
+    document.getElementById("btnExportCsvSecondary").addEventListener("click", () => {
+      const total = counts.bike + counts.car + counts.bus + counts.truck;
+      const pcu = ((counts.bike * 0.5) + (counts.car * 1.0) + (counts.bus * 3.0) + (counts.truck * 3.0)).toFixed(1);
+      const csv = `Junction,Road,Zone,TotalVehicles,Bikes,Cars,Buses,Trucks,Inbound,Outbound,PCU_Load,OfficerBadge,Timestamp\n"${currentJunction.name}","${currentJunction.road}","${currentJunction.zone}",${total},${counts.bike},${counts.car},${counts.bus},${counts.truck},${counts.inbound},${counts.outbound},${pcu},"NTP-402","${new Date().toISOString()}"\n`;
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `TrafficIQ_${currentJunction.name.replace(/\s+/g, '_')}_${Date.now()}.csv`;
+      link.click();
+      showToast("📥 Telemetry CSV exported successfully for NMC Planners");
+    });
+
+    document.getElementById("btnResetDanger").addEventListener("click", () => {
+      if (confirm("Reset current counters for a fresh observation session at " + currentJunction.name + "?")) {
+        counts = { bike: 0, car: 0, bus: 0, truck: 0, inbound: 0, outbound: 0 };
+        sessionStartTime = Date.now();
+        volumeHistory = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        pcuHistory = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        updateAnalytics();
+        showToast("↺ Vehicle counters and session timers reset");
+      }
+    });
+
+    // Chowk Selection Modal
+    const chowkModal = document.getElementById("chowkModal");
+    const chowkListContainer = document.getElementById("chowkListContainer");
+
+    function renderJunctionList() {
+      chowkListContainer.innerHTML = "";
+      NAGPUR_JUNCTIONS.forEach(j => {
+        const isSelected = j.name === currentJunction.name;
+        const div = document.createElement("div");
+        div.className = `p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+          isSelected
+            ? 'bg-cyan-500/10 border-cyan-400 text-white'
+            : 'bg-brand-elevated border-white/10 text-slate-300 hover:border-cyan-400/40 hover:text-white'
+        }`;
+        div.innerHTML = `
+          <div>
+            <div class="text-xs font-bold">${j.name}</div>
+            <div class="text-[10px] text-slate-400">${j.road} • ${j.zone}</div>
+          </div>
+          <div class="text-[11px] font-mono font-bold text-cyan-400">${j.peakPcu} PCU</div>
+        `;
+        div.addEventListener("click", () => {
+          currentJunction = j;
+          document.getElementById("currentChowkLabel").textContent = j.name;
+          document.getElementById("metaRoad").textContent = j.road;
+          document.getElementById("metaZone").textContent = j.zone;
+          chowkModal.classList.add("hidden");
+          chowkModal.classList.remove("flex");
+          showToast(`📍 Active junction set to ${j.name}`);
+        });
+        chowkListContainer.appendChild(div);
+      });
+    }
+
+    document.getElementById("btnOpenChowkModal").addEventListener("click", () => {
+      renderJunctionList();
+      chowkModal.classList.remove("hidden");
+      chowkModal.classList.add("flex");
+    });
+
+    document.getElementById("btnCloseChowkModal").addEventListener("click", () => {
+      chowkModal.classList.add("hidden");
+      chowkModal.classList.remove("flex");
+    });
+
+    window.addEventListener("click", (e) => {
+      if (e.target === chowkModal) {
+        chowkModal.classList.add("hidden");
+        chowkModal.classList.remove("flex");
+      }
+    });
+
+    function showToast(message) {
+      const toast = document.getElementById("toastNotification");
+      document.getElementById("toastMsg").textContent = message;
+      toast.classList.remove("translate-y-24", "opacity-0", "pointer-events-none");
+      setTimeout(() => {
+        toast.classList.add("translate-y-24", "opacity-0", "pointer-events-none");
+      }, 3000);
+    }
+
+    // PWA One-Click App Installation Logic
+    let deferredPrompt = null;
+    const btnInstallApp = document.getElementById("btnInstallApp");
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      btnInstallApp.classList.remove("hidden");
+      btnInstallApp.classList.add("animate-bounce");
+      setTimeout(() => btnInstallApp.classList.remove("animate-bounce"), 2500);
+    });
+
+    btnInstallApp.addEventListener("click", async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === "accepted") {
+          showToast("🎉 App installed successfully!");
+        }
+        deferredPrompt = null;
+      } else {
+        showToast("📱 Mobile / Chrome Menu (⋮) ➔ Click 'Add to Home screen' or 'Install App'");
+      }
+    });
+
+    window.addEventListener("appinstalled", () => {
+      showToast("🚀 TrafficIQ is now installed as an App!");
+      btnInstallApp.classList.add("hidden");
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((err) => console.log("SW Reg Error:", err));
+      });
+    }
+
+    updateAnalytics();
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>
