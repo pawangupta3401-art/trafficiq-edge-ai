@@ -1703,8 +1703,11 @@
     });
 
     if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.update());
+      });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch((err) => console.log("SW Reg Error:", err));
+        navigator.serviceWorker.register("./sw.js?v=3").catch((err) => console.log("SW Reg Error:", err));
       });
     }
 
