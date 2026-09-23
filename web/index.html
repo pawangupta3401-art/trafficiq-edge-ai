@@ -296,6 +296,11 @@
               Level Line
             </button>
 
+            <!-- Mute / Unmute Audio Alert (Default OFF) -->
+            <button id="toggleAudio" class="p-2 rounded-lg bg-slate-900/80 border border-white/10 hover:border-white/30 text-slate-300 min-h-[36px] min-w-[36px] flex items-center justify-center text-sm" title="Tripwire Sound (Currently Muted)">
+              <span id="audioIcon">🔇</span>
+            </button>
+
             <!-- Pause / Play -->
             <button id="togglePause" class="p-2 rounded-lg bg-slate-900/80 border border-white/10 hover:border-white/30 text-slate-300 min-h-[36px] min-w-[36px] flex items-center justify-center">
               <svg id="iconPause" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -713,9 +718,12 @@
     let origP2 = { ...p2 };
     let showTripwire = true;
 
-    // Web Audio Synthesizer for tripwire chime
+    // Audio State: Default MUTED (No toing-toing sound)
+    let soundEnabled = false;
     let audioContext = null;
+
     function playTripwireChime() {
+      if (!soundEnabled) return; // Completely silent by default
       try {
         if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
         if (audioContext.state === 'suspended') audioContext.resume();
@@ -1478,6 +1486,14 @@
       `;
       btnTripwire.className = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold ${showTripwire ? 'text-amber-400' : 'text-slate-400'} transition-all min-h-[36px]`;
       showToast(`📍 Counting Tripwire ${showTripwire ? 'Enabled' : 'Disabled'}`);
+    });
+
+    const btnAudio = document.getElementById("toggleAudio");
+    btnAudio.addEventListener("click", () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById("audioIcon").textContent = soundEnabled ? "🔊" : "🔇";
+      btnAudio.title = soundEnabled ? "Tripwire Audio: ON" : "Tripwire Audio: OFF (Muted)";
+      showToast(soundEnabled ? "🔊 Tripwire Audio Alert Enabled" : "🔇 Tripwire Audio Muted (Silent)");
     });
 
     const btnPause = document.getElementById("togglePause");
