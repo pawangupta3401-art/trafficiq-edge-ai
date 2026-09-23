@@ -240,7 +240,7 @@
         <div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none z-20">
           <div class="px-2.5 py-1 rounded-md bg-slate-950/85 backdrop-blur-md border border-white/10 text-[11px] font-mono flex items-center gap-1.5 text-slate-300">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span id="streamModeBadge">EDGE SIMULATOR</span>
+            <span id="streamModeBadge">LIVE STREET CAMERA</span>
           </div>
           <div class="px-2.5 py-1 rounded-md bg-slate-950/85 backdrop-blur-md border border-white/10 text-[11px] font-mono text-slate-300">
             <span id="sessionTimerBadge">00:00:00</span>
@@ -276,12 +276,14 @@
 
         <!-- Floating Glassmorphism Player Controls Bar -->
         <div class="absolute bottom-3 inset-x-3 sm:inset-x-6 glass-toolbar rounded-xl p-2 sm:p-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xl z-20">
-          <div class="flex items-center bg-slate-900/80 p-0.5 rounded-lg border border-white/10 text-xs">
-            <button id="toggleSimFeed" class="px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]">
-              Simulated Feed
-            </button>
-            <button id="toggleCamFeed" class="px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]">
-              Live Street Cam
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-white/15 text-xs font-mono">
+              <span id="camLiveDot" class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              <span id="camStatusLabel" class="font-bold text-slate-100">FIELD CAMERA</span>
+            </div>
+            <button id="btnToggleCameraPower" class="px-3 py-1.5 rounded-lg font-semibold text-xs text-slate-900 bg-brand-cyan hover:bg-cyan-300 transition-all min-h-[36px] flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+              <span>📷</span>
+              <span id="btnCamPowerText">Restart Camera</span>
             </button>
           </div>
 
@@ -745,42 +747,7 @@
     const ctx = canvas.getContext("2d");
     const video = document.getElementById("webcamStream");
 
-    // Spawn realistic Indian vehicle entity
-    function spawnVehicle() {
-      const roll = Math.random();
-      let type, color, width, height, speedY;
-
-      // Realistic Nagpur Traffic Mix: 48% Two-Wheelers, 34% Cars/Autos, 10% Buses, 8% Commercial
-      if (roll < 0.48) {
-        type = "BIKE"; color = "#F59E0B"; width = 38; height = 56; speedY = 2.4 + Math.random() * 1.5;
-      } else if (roll < 0.82) {
-        type = "CAR"; color = "#00D2FF"; width = 70; height = 96; speedY = 2.0 + Math.random() * 0.9;
-      } else if (roll < 0.92) {
-        type = "BUS"; color = "#10B981"; width = 92; height = 140; speedY = 1.4 + Math.random() * 0.4;
-      } else {
-        type = "TRUCK"; color = "#EF4444"; width = 98; height = 148; speedY = 1.3 + Math.random() * 0.3;
-      }
-
-      const lane = Math.floor(Math.random() * 4);
-      const laneX = (canvas.width * 0.14) + (lane * (canvas.width * 0.185)) + (Math.random() * 20 - 10);
-
-      const isEmergency = (Math.random() < 0.03 && type === "CAR"); // Occasional ambulance / siren emergency vehicle
-      if (isEmergency) color = "#FF0055";
-
-      activeVehicles.push({
-        id: nextTrackId++,
-        type, color, x: laneX, y: -160, width, height, speedY,
-        history: [{ x: laneX + width / 2, y: -160 + height / 2 }],
-        hasCrossed: false,
-        confidence: 0.88 + Math.random() * 0.10,
-        isEmergency
-      });
-    }
-
-    for (let i = 0; i < 4; i++) {
-      spawnVehicle();
-      activeVehicles[i].y = 80 + i * 110;
-    }
+    // 100% Real Camera Mode: No fake/simulated vehicles!
 
     // =========================================================================
     // 2D LINE INTERSECTION & DIRECTIONAL MATH FOR TILTED TRIPWIRE               //
@@ -959,86 +926,17 @@
       }
 
       if (!isPaused) {
-        if (streamMode === "cam") {
-          if (video.readyState >= 2 && video.videoWidth > 0) {
-            // Real camera stream active: render cleanly
-            ctx.save();
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            ctx.restore();
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          // Render real camera stream directly
+          ctx.save();
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
 
-            // Real-time Camera Vision Processing (Detects actual moving vehicles)
-            processCameraFeedVision(now);
-          } else {
-            // Camera initializing state
-            ctx.fillStyle = "#070A0F";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00D2FF";
-            ctx.font = "bold 18px 'Inter', sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText("📷 CONNECTING CAMERA STREAM...", canvas.width / 2, canvas.height / 2 - 12);
-            ctx.fillStyle = "#94A3B8";
-            ctx.font = "13px 'Inter', sans-serif";
-            ctx.fillText("Please tap 'Allow' when your browser prompts for Camera Access", canvas.width / 2, canvas.height / 2 + 16);
-            ctx.textAlign = "start";
-          }
+          // Real-time Camera Vision Processing (Detects actual physical vehicles)
+          processCameraFeedVision(now);
         } else {
-          // Simulator Mode: Draw simulated road & vehicles
-          drawRoad();
-
-          const toRemove = [];
-
-          for (let i = 0; i < activeVehicles.length; i++) {
-            const v = activeVehicles[i];
-            const prevPos = { x: v.x + v.width / 2, y: v.y + v.height / 2 };
-            v.y += v.speedY;
-            const currPos = { x: v.x + v.width / 2, y: v.y + v.height / 2 };
-
-            v.history.push(currPos);
-            if (v.history.length > 18) v.history.shift();
-
-            // Check Line Intersection against Tilted / Rotated Tripwire
-            if (showTripwire && !v.hasCrossed && checkSegmentsIntersect(prevPos, currPos, p1, p2)) {
-              v.hasCrossed = true;
-              lastCrossedTimestamp = Date.now();
-              playTripwireChime();
-
-              const dir = getCrossProductDirection(prevPos, currPos, p1, p2);
-              if (dir === "INBOUND") counts.inbound++;
-              else counts.outbound++;
-
-              if (v.type === "BIKE") counts.bike++;
-              else if (v.type === "CAR") counts.car++;
-              else if (v.type === "BUS") counts.bus++;
-              else if (v.type === "TRUCK") counts.truck++;
-
-              // Emergency siren proxy alert
-              if (v.isEmergency) {
-                const alertBox = document.getElementById("emergencyVehicleAlert");
-                alertBox.classList.remove("-translate-y-16", "opacity-0");
-                setTimeout(() => alertBox.classList.add("-translate-y-16", "opacity-0"), 4000);
-              }
-
-              const banner = document.getElementById("crossingIndicatorBanner");
-              banner.classList.remove("opacity-0");
-              setTimeout(() => banner.classList.add("opacity-0"), 500);
-
-              updateAnalytics();
-            }
-
-            drawVehicle(v);
-
-            if (v.y > canvas.height + 120) {
-              toRemove.push(i);
-            }
-          }
-
-          for (let i = toRemove.length - 1; i >= 0; i--) {
-            activeVehicles.splice(toRemove[i], 1);
-          }
-
-          if (activeVehicles.length < 5 && Math.random() < 0.04) {
-            spawnVehicle();
-          }
+          // Tech Viewfinder Overlay while camera connects or waits for access
+          drawCameraViewfinderOverlay();
         }
 
         // Draw Interactive Tripwire Line & Touch Handles
@@ -1050,32 +948,46 @@
       requestAnimationFrame(renderFrame);
     }
 
-    function drawRoad() {
-      ctx.fillStyle = isHighContrastSunlight ? "#E2E8F0" : "#070A0F";
+    function drawCameraViewfinderOverlay() {
+      ctx.fillStyle = isHighContrastSunlight ? "#F8FAFC" : "#070A0F";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const roadLeft = canvas.width * 0.10;
-      const roadWidth = canvas.width * 0.80;
-
-      ctx.fillStyle = isHighContrastSunlight ? "#CBD5E1" : "#111827";
-      ctx.fillRect(roadLeft, 0, roadWidth, canvas.height);
-
-      ctx.strokeStyle = isHighContrastSunlight ? "#94A3B8" : "#1E293B";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(roadLeft, 0, roadWidth, canvas.height);
-
-      ctx.strokeStyle = isHighContrastSunlight ? "rgba(0, 0, 0, 0.25)" : "rgba(255, 255, 255, 0.12)";
-      ctx.setLineDash([20, 16]);
-      ctx.lineWidth = 2;
-
-      for (let lane = 1; lane < 4; lane++) {
-        const laneX = roadLeft + (lane * (roadWidth / 4));
-        ctx.beginPath();
-        ctx.moveTo(laneX, 0);
-        ctx.lineTo(laneX, canvas.height);
-        ctx.stroke();
+      // Tech Grid & Viewfinder Reticle
+      ctx.strokeStyle = isHighContrastSunlight ? "rgba(0, 0, 0, 0.08)" : "rgba(0, 210, 255, 0.12)";
+      ctx.lineWidth = 1;
+      const step = 48;
+      for (let x = 0; x < canvas.width; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
       }
-      ctx.setLineDash([]);
+      for (let y = 0; y < canvas.height; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Center crosshair target
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      ctx.strokeStyle = "#00D2FF";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - 55, cy); ctx.lineTo(cx + 55, cy);
+      ctx.moveTo(cx, cy - 55); ctx.lineTo(cx, cy + 55);
+      ctx.stroke();
+
+      // Viewfinder status text
+      ctx.fillStyle = "#00D2FF";
+      ctx.font = "bold 18px 'Inter', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("📷 REAL-TIME CAMERA SURVEY READY", cx, cy - 70);
+
+      ctx.fillStyle = isHighContrastSunlight ? "#475569" : "#94A3B8";
+      ctx.font = "13px 'Inter', sans-serif";
+      ctx.fillText("Point camera at oncoming traffic & drag the dashed tripwire to match lane angle", cx, cy + 70);
+      ctx.fillText("Tap 'Restart Camera' below if camera access is pending", cx, cy + 92);
+      ctx.textAlign = "start";
     }
 
     function drawInteractiveTripwire() {
@@ -1147,51 +1059,7 @@
       ctx.stroke();
     }
 
-    function drawVehicle(v) {
-      if (v.history.length > 1) {
-        ctx.strokeStyle = v.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < v.history.length; i++) {
-          const pt = v.history[i];
-          if (i === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.globalAlpha = 0.35;
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
-      }
 
-      ctx.fillStyle = v.color + "18";
-      ctx.fillRect(v.x, v.y, v.width, v.height);
-      ctx.strokeStyle = v.color;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(v.x, v.y, v.width, v.height);
-
-      // AI HUD Corner Brackets
-      const bLen = Math.min(v.width * 0.28, 14);
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 2.5;
-
-      ctx.beginPath(); ctx.moveTo(v.x, v.y + bLen); ctx.lineTo(v.x, v.y); ctx.lineTo(v.x + bLen, v.y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(v.x + v.width - bLen, v.y); ctx.lineTo(v.x + v.width, v.y); ctx.lineTo(v.x + v.width, v.y + bLen); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(v.x, v.y + v.height - bLen); ctx.lineTo(v.x, v.y + v.height); ctx.lineTo(v.x + bLen, v.y + v.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(v.x + v.width - bLen, v.y + v.height); ctx.lineTo(v.x + v.width, v.y + v.height); ctx.lineTo(v.x + v.width, v.y + v.height - bLen); ctx.stroke();
-
-      ctx.fillStyle = v.hasCrossed ? "#10B981" : "#FFFFFF";
-      ctx.beginPath();
-      ctx.arc(v.x + v.width / 2, v.y + v.height / 2, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      const label = `${v.isEmergency ? 'AMBULANCE' : v.type} #${v.id} ${(v.confidence * 100).toFixed(0)}%`;
-      ctx.font = "bold 11px 'Inter', sans-serif";
-      const txtWidth = ctx.measureText(label).width;
-
-      ctx.fillStyle = v.color;
-      ctx.fillRect(v.x, v.y - 19, txtWidth + 10, 19);
-      ctx.fillStyle = "#0B0F17";
-      ctx.fillText(label, v.x + 5, v.y - 5);
-    }
 
     // =========================================================================
     // TOUCH & MOUSE GESTURE HANDLERS FOR CALIBRATING TRIPWIRE                   //
@@ -1597,33 +1465,19 @@
       cameraTrackedObjects = [];
       prevCamData = null;
 
-      btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
-      btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
       document.getElementById("streamModeBadge").textContent = `LIVE CAM (${currentCameraFacing.toUpperCase()})`;
+      const pwrBtnText = document.getElementById("btnCamPowerText");
+      if (pwrBtnText) pwrBtnText.textContent = "Restart Camera";
       showToast(`✓ Camera live! Point at oncoming traffic`);
       return true;
     }
 
-    btnSim.addEventListener("click", () => {
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(t => t.stop());
-      }
-      streamMode = "sim";
-      cameraTrackedObjects = [];
-      activeVehicles = [];
-      for (let i = 0; i < 3; i++) {
-        spawnVehicle();
-        activeVehicles[i].y = 80 + i * 140;
-      }
-      btnSim.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-900 bg-brand-cyan transition-all min-h-[36px]";
-      btnCam.className = "px-2.5 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition-all min-h-[36px]";
-      document.getElementById("streamModeBadge").textContent = "EDGE SIMULATOR";
-      showToast("✓ Activated Edge Traffic Simulator");
-    });
-
-    btnCam.addEventListener("click", async () => {
-      await startCameraStream();
-    });
+    const btnToggleCameraPower = document.getElementById("btnToggleCameraPower");
+    if (btnToggleCameraPower) {
+      btnToggleCameraPower.addEventListener("click", async () => {
+        await startCameraStream();
+      });
+    }
 
     const btnTripwire = document.getElementById("toggleTripwireVisibility");
     btnTripwire.addEventListener("click", () => {
@@ -1856,6 +1710,14 @@
 
     updateAnalytics();
     requestAnimationFrame(renderFrame);
+
+    // 100% Real Camera Mode: Auto-start camera immediately on load
+    window.addEventListener("DOMContentLoaded", () => {
+      startCameraStream();
+    });
+    setTimeout(() => {
+      if (!cameraTrack) startCameraStream();
+    }, 350);
   </script>
 </body>
 </html>
