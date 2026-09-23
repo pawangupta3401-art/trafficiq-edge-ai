@@ -2,6 +2,11 @@
 
 > **A smartphone-deployable, on-device computer vision system for real-time vehicle classification, counting, and congestion analytics without expensive CCTV infrastructure.**
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black?style=for-the-badge&logo=vercel)](https://trafficiq-edge-ai.vercel.app)
+[![PWA Ready](https://img.shields.io/badge/PWA-Installable_Mobile_App-00D2FF?style=for-the-badge)](https://trafficiq-edge-ai.vercel.app)
+
+🌐 **Live Production App URL:** **[https://trafficiq-edge-ai.vercel.app](https://trafficiq-edge-ai.vercel.app)**
+
 ---
 
 ## 1. Problem Statement & Motivation
